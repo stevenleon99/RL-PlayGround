@@ -1,0 +1,136 @@
+# ======================
+# Unity (drone-simulator/)
+# ======================
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Asset meta data should only be ignored when the temp cache is the only place they exist
+# (handled by Unity automatically); keep .meta for tracked assets.
+
+# Visual Studio / Rider / VS Code cache
+.vs/
+.idea/
+.vscode/
+
+# Unity-generated solution & project files
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity builds & binaries
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+*.x86_64
+*.x86
+
+# Crash reports
+sysinfo.txt
+crashlytics-build.properties
+
+# ======================
+# Python (RL agent)
+# ======================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+build/
+dist/
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+sdist/
+wheels/
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# PyTest / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Type checkers / linters
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# ML / RL artifacts
+checkpoints/
+outputs/
+runs/
+wandb/
+mlruns/
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.h5
+events.out.tfevents.*
+
+# Data
+data/
+datasets/
+*.csv
+*.parquet
+*.npy
+*.npz
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ======================
+# Secrets / local config
+# ======================
+.env
+.env.local
+*.secret
+secrets.json
