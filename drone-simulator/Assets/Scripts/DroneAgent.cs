@@ -7,19 +7,26 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody))]
 public class DroneAgent : Agent
 {
-    [Header("References")]
-    [SerializeField] private Transform target;
-
     [Header("Force constants — mirror DroneController so behavior matches")]
     public float liftForce = 15f;
-    public float moveForce = 8f;            // kept for parity; not used by the 4-D action mapping
+    public float moveForce = 8f;
     public float yawTorque = 3f;
     public float tiltTorque = 2f;
     public float stabilizationStrength = 1.5f;
 
     [Header("Episode")]
-    public float reachThreshold = 1.5f;
+    public float hoverTargetX = 5.0f;
+    public float hoverTargetY = 8.0f;
+    public float hoverTargetZ = 5.0f;
+    public float startX = 0.0f;
+    public float startY = 0.4f;
+    public float startZ = 0.0f;
     public float groundY = 0.3f;
+    public float maxHorizontalDrift = 30f;
+    public float maxHeight = 10f;
+    public float badHoverY = 0.8f;
+    public float resetHorizontalRange = 1.0f;
+    public float resetVerticalRange = 0.1f;
 
     private Rigidbody rb;
     private Vector3 startPos;
@@ -28,11 +35,16 @@ public class DroneAgent : Agent
     {
         rb = GetComponent<Rigidbody>();
         startPos = transform.localPosition;
+
+        Debug.Log(
+            $"DroneAgent hover config: target=({hoverTargetX:F2}, {hoverTargetY:F2}, {hoverTargetZ:F2}), " +
+            $"start=({startX:F2}, {startY:F2}, {startZ:F2}), " +
+            $"maxHeight={maxHeight:F2}, badHoverY={badHoverY:F2}");
     }
 
     public override void OnEpisodeBegin()
     {
-        transform.localPosition = startPos;
+        transform.localPosition = GetRandomStartPosition();
         transform.localRotation = Quaternion.identity;
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
@@ -41,9 +53,9 @@ public class DroneAgent : Agent
     // 14-D observation vector.
     public override void CollectObservations(VectorSensor sensor)
     {
-        // Relative vector to target (3) — normalized by a rough scene scale.
-        Vector3 toTarget = (target != null ? target.position : transform.position) - transform.position;
-        sensor.AddObservation(toTarget / 10f);
+        // Relative vector to the desired hover point (3).
+        Vector3 toHoverPoint = GetHoverPosition() - transform.position;
+        sensor.AddObservation(toHoverPoint / 10f);
 
         // Linear velocity (3) and angular velocity (3).
         sensor.AddObservation(rb.linearVelocity / 10f);
@@ -68,36 +80,75 @@ public class DroneAgent : Agent
         var c = actions.ContinuousActions;
         float thrust = Mathf.Clamp(c[0], -1f, 1f);
         float yaw    = Mathf.Clamp(c[1], -1f, 1f);
-        float pitch  = Mathf.Clamp(c[2], -1f, 1f);
-        float roll   = Mathf.Clamp(c[3], -1f, 1f);
+        float forward = Mathf.Clamp(c[2], -1f, 1f);
+        float right   = Mathf.Clamp(c[3], -1f, 1f);
 
         rb.AddForce(Vector3.up * thrust * liftForce, ForceMode.Force);
+        rb.AddForce(transform.forward * forward * moveForce, ForceMode.Force);
+        rb.AddForce(transform.right * right * moveForce, ForceMode.Force);
         rb.AddTorque(Vector3.up * yaw * yawTorque, ForceMode.Force);
-        rb.AddTorque(transform.right * pitch * tiltTorque, ForceMode.Force);
-        rb.AddTorque(transform.forward * -roll * tiltTorque, ForceMode.Force);
 
         StabilizeDrone();
 
-        // --- Rewards (fly-to-target) --------------------------------------
-        if (target != null)
+        // --- Rewards (move to the target position and hover there) --------
+        Vector3 hoverPosition = GetHoverPosition();
+        Vector3 positionError = transform.position - hoverPosition;
+        float heightError = Mathf.Abs(positionError.y);
+        float horizontalError = new Vector2(positionError.x, positionError.z).magnitude;
+        float speed = rb.linearVelocity.magnitude;
+        float angularSpeed = rb.angularVelocity.magnitude;
+        float uprightness = Vector3.Dot(transform.up, Vector3.up);
+
+        AddReward(0.01f);
+        AddReward(-heightError * 0.03f);
+        AddReward(-horizontalError * 0.01f);
+        AddReward(-speed * 0.004f);
+        AddReward(-angularSpeed * 0.002f);
+        AddReward((uprightness - 1f) * 0.01f);
+
+        bool isStoppedAtWrongHeight =
+            Mathf.Abs(transform.position.y - badHoverY) < 0.15f &&
+            Mathf.Abs(rb.linearVelocity.y) < 0.1f;
+
+        if (isStoppedAtWrongHeight)
         {
-            float dist = Vector3.Distance(transform.position, target.position);
-            AddReward(-dist * 0.001f);                       // dense progress
-            if (dist < reachThreshold)
-            {
-                AddReward(10f);                              // sparse success bonus
-                EndEpisode();
-            }
+            AddReward(-0.05f);
         }
 
-        if (transform.position.y < groundY ||
-            Vector3.Dot(transform.up, Vector3.up) < 0f)
+        bool isHovering =
+            heightError < 0.08f &&
+            horizontalError < 0.25f &&
+            speed < 0.2f &&
+            angularSpeed < 0.2f &&
+            uprightness > 0.95f;
+
+        if (isHovering)
         {
-            AddReward(-5f);                                  // crash / flip penalty
+            AddReward(0.05f);
+        }
+
+        float effectiveMaxHeight = Mathf.Max(maxHeight, hoverTargetY + 2f);
+        string resetReason = null;
+
+        if (transform.position.y < groundY)
+        {
+            resetReason = $"too low: y={transform.position.y:F2}, groundY={groundY:F2}";
+        }
+        else if (transform.position.y > effectiveMaxHeight)
+        {
+            resetReason = $"too high: y={transform.position.y:F2}, maxHeight={effectiveMaxHeight:F2}";
+        }
+        else if (uprightness < 0f)
+        {
+            resetReason = $"flipped: uprightness={uprightness:F2}";
+        }
+
+        if (resetReason != null)
+        {
+            AddReward(-2f);
+            Debug.Log($"DroneAgent ending episode: {resetReason}");
             EndEpisode();
         }
-
-        AddReward(-0.0001f);                                 // tiny step cost
     }
 
     // Manual control for sanity-checking the agent's physics.
@@ -110,8 +161,10 @@ public class DroneAgent : Agent
 
         c[0] = kb.spaceKey.isPressed ? 1f : (kb.leftCtrlKey.isPressed ? -0.5f : 0f);
         c[1] = (kb.eKey.isPressed ? 1f : 0f) - (kb.qKey.isPressed ? 1f : 0f);
-        c[2] = (kb.upArrowKey.isPressed ? 1f : 0f) - (kb.downArrowKey.isPressed ? 1f : 0f);
-        c[3] = (kb.rightArrowKey.isPressed ? 1f : 0f) - (kb.leftArrowKey.isPressed ? 1f : 0f);
+        c[2] = ((kb.wKey.isPressed || kb.upArrowKey.isPressed) ? 1f : 0f) -
+               ((kb.sKey.isPressed || kb.downArrowKey.isPressed) ? 1f : 0f);
+        c[3] = ((kb.dKey.isPressed || kb.rightArrowKey.isPressed) ? 1f : 0f) -
+               ((kb.aKey.isPressed || kb.leftArrowKey.isPressed) ? 1f : 0f);
     }
 
     // --- Helpers (lifted from DroneController so stabilization is identical) ---
@@ -128,5 +181,19 @@ public class DroneAgent : Agent
     {
         if (angle > 180f) angle -= 360f;
         return angle;
+    }
+
+    private Vector3 GetHoverPosition()
+    {
+        return new Vector3(hoverTargetX, hoverTargetY, hoverTargetZ);
+    }
+
+    private Vector3 GetRandomStartPosition()
+    {
+        Vector3 startPosition = new Vector3(startX, startY, startZ);
+        return startPosition + new Vector3(
+            Random.Range(-resetHorizontalRange, resetHorizontalRange),
+            Random.Range(-resetVerticalRange, resetVerticalRange),
+            Random.Range(-resetHorizontalRange, resetHorizontalRange));
     }
 }

@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Bash(.venv/Scripts/python.exe -c \"import mlagents_envs; print\\('mlagents_envs:', mlagents_envs.__version__\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import mlagents; print\\('mlagents:', mlagents.__version__\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pip index versions mlagents-envs)",
+      "Bash(.venv/Scripts/python.exe -m pip index versions mlagents)",
+      "Bash(uv pip:*)",
+      "Bash(.venv/Scripts/python.exe -c \"import urllib.request, json; data=json.loads\\(urllib.request.urlopen\\('https://pypi.org/pypi/mlagents-envs/json'\\).read\\(\\)\\); print\\('latest:', data['info']['version']\\); print\\('all:', sorted\\([k for k in data['releases'].keys\\(\\)], key=lambda v: [int\\(x\\) for x in v.split\\('.'\\) if x.isdigit\\(\\)]\\)\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pip list)"
     ]
   }
 }
