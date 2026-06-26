@@ -87,8 +87,7 @@ Confirm `Window → Package Manager → ML Agents` shows the version.
 
 ## 4. Write `DroneAgent.cs`
 
-Create `drone-simulator/Assets/Scripts/DroneAgent.cs` (no space in the name —
-deliberately distinct from the existing `Drone Controller.cs`):
+Create `drone-simulator/Assets/Scripts/DroneAgent.cs`:
 
 ```csharp
 using UnityEngine;

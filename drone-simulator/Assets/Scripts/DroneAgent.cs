@@ -5,6 +5,7 @@ using Unity.MLAgents.Sensors;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(DroneCollisionHandler))]
 public class DroneAgent : Agent
 {
     [Header("Force constants — mirror DroneController so behavior matches")]
@@ -15,31 +16,36 @@ public class DroneAgent : Agent
     public float stabilizationStrength = 1.5f;
 
     [Header("Episode")]
-    public float hoverTargetX = 5.0f;
-    public float hoverTargetY = 8.0f;
-    public float hoverTargetZ = 5.0f;
-    public float startX = 0.0f;
-    public float startY = 0.4f;
-    public float startZ = 0.0f;
-    public float groundY = 0.3f;
-    public float maxHorizontalDrift = 30f;
-    public float maxHeight = 10f;
-    public float badHoverY = 0.8f;
+    // Target hover position (x, y, z) in world space.
+    public float hoverTargetX = 25.0f;
+    public float hoverTargetY = 7.0f;
+    public float hoverTargetZ = 1.0f;
+    // constrains according to the environment size (see ground plane in the scene)
+    public float min_y = 0.0f;
+    public float max_y = 10f;
+    public float min_x = -75.0f;
+    public float max_x = 75.0f;
+    public float min_z = -85.0f;
+    public float max_z = 85.0f;
     public float resetHorizontalRange = 1.0f;
     public float resetVerticalRange = 0.1f;
-
+    public float resetPenalty = -2.0f;
+    public float obstacleCollisionPenalty = -2.0f;
+    public float max_uprightness = 0.0f; // from -1.0 (upside down) to 1.0 (upright), 0 means sideways
     private Rigidbody rb;
+    private DroneCollisionHandler collisionHandler;
     private Vector3 startPos;
 
     public override void Initialize()
     {
         rb = GetComponent<Rigidbody>();
+        collisionHandler = GetComponent<DroneCollisionHandler>();
         startPos = transform.localPosition;
 
         Debug.Log(
             $"DroneAgent hover config: target=({hoverTargetX:F2}, {hoverTargetY:F2}, {hoverTargetZ:F2}), " +
-            $"start=({startX:F2}, {startY:F2}, {startZ:F2}), " +
-            $"maxHeight={maxHeight:F2}, badHoverY={badHoverY:F2}");
+            $"start=({startPos.x:F2}, {startPos.y:F2}, {startPos.z:F2}), " +
+            $"maxHeight={max_y:F2}");
     }
 
     public override void OnEpisodeBegin()
@@ -48,6 +54,7 @@ public class DroneAgent : Agent
         transform.localRotation = Quaternion.identity;
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
+        collisionHandler.IsCollided = false;
     }
 
     // 14-D observation vector.
@@ -106,15 +113,6 @@ public class DroneAgent : Agent
         AddReward(-angularSpeed * 0.002f);
         AddReward((uprightness - 1f) * 0.01f);
 
-        bool isStoppedAtWrongHeight =
-            Mathf.Abs(transform.position.y - badHoverY) < 0.15f &&
-            Mathf.Abs(rb.linearVelocity.y) < 0.1f;
-
-        if (isStoppedAtWrongHeight)
-        {
-            AddReward(-0.05f);
-        }
-
         bool isHovering =
             heightError < 0.08f &&
             horizontalError < 0.25f &&
@@ -127,44 +125,32 @@ public class DroneAgent : Agent
             AddReward(0.05f);
         }
 
-        float effectiveMaxHeight = Mathf.Max(maxHeight, hoverTargetY + 2f);
-        string resetReason = null;
+        float effectiveMaxHeight = Mathf.Max(max_y, hoverTargetY + 2f);
+        string isResetReason = null;
+        float terminalPenalty = resetPenalty;
 
-        if (transform.position.y < groundY)
+        // Reset if out of bounds or flipped.
+        if (transform.position.x < min_x || transform.position.x > max_x || 
+            transform.position.z < min_z || transform.position.z > max_z || 
+            transform.position.y < min_y || transform.position.y > effectiveMaxHeight ||
+            uprightness < max_uprightness)
         {
-            resetReason = $"too low: y={transform.position.y:F2}, groundY={groundY:F2}";
+            isResetReason = "out of bounds or flipped. transform.position=" + transform.position.ToString("F2") + ", uprightness=" + uprightness.ToString("F2");
         }
-        else if (transform.position.y > effectiveMaxHeight)
+        // reset if hit by the obstacle (detected by DroneCollisionHandler)
+        else if (collisionHandler.IsCollided)
         {
-            resetReason = $"too high: y={transform.position.y:F2}, maxHeight={effectiveMaxHeight:F2}";
+            isResetReason = "collided with obstacle";
+            terminalPenalty = obstacleCollisionPenalty;
+            collisionHandler.IsCollided = false;
         }
-        else if (uprightness < 0f)
+        
+        if (isResetReason != null)
         {
-            resetReason = $"flipped: uprightness={uprightness:F2}";
-        }
-
-        if (resetReason != null)
-        {
-            AddReward(-2f);
-            Debug.Log($"DroneAgent ending episode: {resetReason}");
+            AddReward(terminalPenalty);
+            Debug.Log($"DroneAgent ending episode: {isResetReason}");
             EndEpisode();
         }
-    }
-
-    // Manual control for sanity-checking the agent's physics.
-    // Set Behavior Type = "Heuristic Only" in the Inspector to use.
-    public override void Heuristic(in ActionBuffers actionsOut)
-    {
-        var c = actionsOut.ContinuousActions;
-        var kb = Keyboard.current;
-        if (kb == null) return;
-
-        c[0] = kb.spaceKey.isPressed ? 1f : (kb.leftCtrlKey.isPressed ? -0.5f : 0f);
-        c[1] = (kb.eKey.isPressed ? 1f : 0f) - (kb.qKey.isPressed ? 1f : 0f);
-        c[2] = ((kb.wKey.isPressed || kb.upArrowKey.isPressed) ? 1f : 0f) -
-               ((kb.sKey.isPressed || kb.downArrowKey.isPressed) ? 1f : 0f);
-        c[3] = ((kb.dKey.isPressed || kb.rightArrowKey.isPressed) ? 1f : 0f) -
-               ((kb.aKey.isPressed || kb.leftArrowKey.isPressed) ? 1f : 0f);
     }
 
     // --- Helpers (lifted from DroneController so stabilization is identical) ---
@@ -190,10 +176,25 @@ public class DroneAgent : Agent
 
     private Vector3 GetRandomStartPosition()
     {
-        Vector3 startPosition = new Vector3(startX, startY, startZ);
-        return startPosition + new Vector3(
+        return startPos + new Vector3(
             Random.Range(-resetHorizontalRange, resetHorizontalRange),
             Random.Range(-resetVerticalRange, resetVerticalRange),
             Random.Range(-resetHorizontalRange, resetHorizontalRange));
+    }
+
+    // Manual control for sanity-checking the agent's physics.
+    // Set Behavior Type = "Heuristic Only" in the Inspector to use.
+    public override void Heuristic(in ActionBuffers actionsOut)
+    {
+        var c = actionsOut.ContinuousActions;
+        var kb = Keyboard.current;
+        if (kb == null) return;
+
+        c[0] = kb.spaceKey.isPressed ? 1f : (kb.leftCtrlKey.isPressed ? -0.5f : 0f);
+        c[1] = (kb.eKey.isPressed ? 1f : 0f) - (kb.qKey.isPressed ? 1f : 0f);
+        c[2] = ((kb.wKey.isPressed || kb.upArrowKey.isPressed) ? 1f : 0f) -
+               ((kb.sKey.isPressed || kb.downArrowKey.isPressed) ? 1f : 0f);
+        c[3] = ((kb.dKey.isPressed || kb.rightArrowKey.isPressed) ? 1f : 0f) -
+               ((kb.aKey.isPressed || kb.leftArrowKey.isPressed) ? 1f : 0f);
     }
 }

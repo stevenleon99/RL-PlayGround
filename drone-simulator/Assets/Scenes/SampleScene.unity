@@ -133,7 +133,7 @@ GameObject:
   - component: {fileID: 26975125}
   m_Layer: 0
   m_Name: obs_cube3
-  m_TagString: Untagged
+  m_TagString: Obstacle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -245,7 +245,7 @@ GameObject:
   - component: {fileID: 66740731}
   m_Layer: 0
   m_Name: obs_cube1
-  m_TagString: Untagged
+  m_TagString: Obstacle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -799,7 +799,7 @@ GameObject:
   - component: {fileID: 969918911}
   m_Layer: 0
   m_Name: obs_cube2
-  m_TagString: Untagged
+  m_TagString: Obstacle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1252,6 +1252,7 @@ GameObject:
   - component: {fileID: 1221055930}
   - component: {fileID: 1221055929}
   - component: {fileID: 1221055931}
+  - component: {fileID: 1221055932}
   m_Layer: 0
   m_Name: Drone
   m_TagString: Untagged
@@ -1268,7 +1269,7 @@ Transform:
   m_GameObject: {fileID: 1221055926}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 9.91, y: 14.48, z: -31.18}
+  m_LocalPosition: {x: 9.91, y: 3, z: -31.18}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1329,14 +1330,18 @@ MonoBehaviour:
   yawTorque: 3
   tiltTorque: 2
   stabilizationStrength: 1.5
-  hoverTargetY: 0.8
-  groundY: 0.3
-  maxHorizontalDrift: 5
-  maxHeight: 3
-  badHoverY: 0.8
-  resetHorizontalRange: 0.75
-  resetMinY: 0.35
-  resetMaxY: 0.45
+  hoverTargetX: 25
+  hoverTargetY: 7
+  hoverTargetZ: 1
+  min_y: 0
+  max_y: 10
+  min_x: -75
+  max_x: 75
+  min_z: -85
+  max_z: 85
+  resetHorizontalRange: 1
+  resetVerticalRange: 0.1
+  max_uprightness: 0
 --- !u!114 &1221055930
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1380,9 +1385,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a5c9d521e5ef4759a8246a07d52221e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.ML-Agents::Unity.MLAgents.DecisionRequester
-  DecisionPeriod: 5
+  DecisionPeriod: 15
   DecisionStep: 0
   TakeActionsBetweenDecisions: 1
+--- !u!114 &1221055932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1221055926}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3da259dc984c57f4aa7d92a7c3f7e1a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DroneCollisionHandler
 --- !u!1 &1262164924
 GameObject:
   m_ObjectHideFlags: 0
@@ -1639,7 +1656,7 @@ Transform:
   m_GameObject: {fileID: 1442261653}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 25.37, y: 7, z: 1.16}
+  m_LocalPosition: {x: 25, y: 7, z: 1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
