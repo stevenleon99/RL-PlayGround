@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
@@ -8,6 +9,9 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(DroneCollisionHandler))]
 public class DroneAgent : Agent
 {
+    [Header("Config")]
+    public string configRelativePath = "Scripts/agent.json";
+
     [Header("Force constants — mirror DroneController so behavior matches")]
     public float liftForce = 15f;
     public float moveForce = 8f;
@@ -27,8 +31,8 @@ public class DroneAgent : Agent
     public float max_x = 75.0f;
     public float min_z = -85.0f;
     public float max_z = 85.0f;
-    public float resetHorizontalRange = 1.0f;
-    public float resetVerticalRange = 0.1f;
+    public float resetHorizontalRange = 30.0f;
+    public float resetVerticalRange = 1.0f;
     public float resetPenalty = -2.0f;
     public float obstacleCollisionPenalty = -2.0f;
     public float max_uprightness = 0.0f; // from -1.0 (upside down) to 1.0 (upright), 0 means sideways
@@ -38,6 +42,8 @@ public class DroneAgent : Agent
 
     public override void Initialize()
     {
+        LoadConfigFromJson();
+
         rb = GetComponent<Rigidbody>();
         collisionHandler = GetComponent<DroneCollisionHandler>();
         startPos = transform.localPosition;
@@ -46,6 +52,19 @@ public class DroneAgent : Agent
             $"DroneAgent hover config: target=({hoverTargetX:F2}, {hoverTargetY:F2}, {hoverTargetZ:F2}), " +
             $"start=({startPos.x:F2}, {startPos.y:F2}, {startPos.z:F2}), " +
             $"maxHeight={max_y:F2}");
+    }
+
+    private void LoadConfigFromJson()
+    {
+        string configPath = Path.Combine(Application.dataPath, configRelativePath);
+        if (!File.Exists(configPath))
+        {
+            Debug.LogError($"DroneAgent config file not found: {configPath}");
+            return;
+        }
+
+        string json = File.ReadAllText(configPath);
+        JsonUtility.FromJsonOverwrite(json, this);
     }
 
     public override void OnEpisodeBegin()

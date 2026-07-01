@@ -1,0 +1,21 @@
+{
+  "liftForce": 15.0,
+  "moveForce": 8.0,
+  "yawTorque": 3.0,
+  "tiltTorque": 2.0,
+  "stabilizationStrength": 1.5,
+  "hoverTargetX": 25.0,
+  "hoverTargetY": 7.0,
+  "hoverTargetZ": 1.0,
+  "min_y": 0.0,
+  "max_y": 10.0,
+  "min_x": -75.0,
+  "max_x": 75.0,
+  "min_z": -85.0,
+  "max_z": 85.0,
+  "resetHorizontalRange": 30.0,
+  "resetVerticalRange": 1.0,
+  "resetPenalty": -2.0,
+  "obstacleCollisionPenalty": -2.0,
+  "max_uprightness": 0.0
+}
